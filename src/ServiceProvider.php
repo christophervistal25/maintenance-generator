@@ -14,7 +14,10 @@ class ServiceProvider extends BaseServiceProvider
      */
     public function register()
     {
-        //
+        $this->mergeConfigFrom(
+            __DIR__ . '/../config/module-generator.php',
+            'module-generator'
+        );
     }
 
     /**
@@ -34,6 +37,11 @@ class ServiceProvider extends BaseServiceProvider
             $this->publishes([
                 __DIR__ . '/Stubs' => resource_path('stubs/vendor/module-generator'),
             ], 'module-generator-stubs');
+
+            // Publish config
+            $this->publishes([
+                __DIR__ . '/../config/module-generator.php' => config_path('module-generator.php'),
+            ], 'module-generator-config');
         }
     }
 }

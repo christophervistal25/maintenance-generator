@@ -1,0 +1,57 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between">
+                        <h3>{{modelName}} List</h3>
+                        <a href="{{ route('{{modelVariable}}.create') }}" class="btn btn-primary">Create New {{modelName}}</a>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    @if (session('success'))
+                        <div class="alert alert-success" role="alert">
+                            {{ session('success') }}
+                        </div>
+                    @endif
+
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <!-- Add your fields here -->
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (${{modelVariable}}s as ${{modelVariable}})
+                            <tr>
+                                <td>{{ ${{modelVariable}}->id }}</td>
+                                <!-- Add your fields here -->
+                                <td>{{ ${{modelVariable}}->created_at->format('Y-m-d') }}</td>
+                                <td>
+                                    <a href="{{ route('{{modelVariable}}.show', ${{modelVariable}}->id) }}" class="btn btn-sm btn-info">View</a>
+                                    <a href="{{ route('{{modelVariable}}.edit', ${{modelVariable}}->id) }}" class="btn btn-sm btn-primary">Edit</a>
+                                    <form action="{{ route('{{modelVariable}}.destroy', ${{modelVariable}}->id) }}" method="POST" style="display: inline-block">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    {{ ${{modelVariable}}s->links() }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
