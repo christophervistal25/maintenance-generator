@@ -1,0 +1,44 @@
+{
+    "name": "devkits/module-generator",
+    "description": "Generate controller, model, view and migration for a Laravel module in one command",
+    "version": "1.0.0",
+    "type": "library",
+    "license": "MIT",
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+    },
+    "authors": [
+        {
+            "name": "Christopher Vistal",
+            "email": "christophervistal25@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.0",
+        "illuminate/support": "^8.0|^9.0|^10.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^6.0|^7.0|^8.0",
+        "phpunit/phpunit": "^9.0|^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "DevKits\\ModuleGenerator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DevKits\\ModuleGenerator\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "DevKits\\ModuleGenerator\\ServiceProvider"
+            ]
+        }
+    }
+}
