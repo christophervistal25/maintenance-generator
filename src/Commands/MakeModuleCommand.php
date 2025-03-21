@@ -356,8 +356,23 @@ class MakeModuleCommand extends Command
         $controllerStub = $this->files->get($stubPath);
         $controllerStub = str_replace('{{controllerName}}', $name . 'Controller', $controllerStub);
         $controllerStub = str_replace('{{modelName}}', $name, $controllerStub);
+
         $modelVariable = lcfirst($name);
+        $routeName = Str::plural($modelVariable); // Use plural for route names
+
         $controllerStub = str_replace('{{modelVariable}}', $modelVariable, $controllerStub);
+
+        // Update all route references in the controller to use plural form
+        // This handles both placeholder route references and already processed ones
+        $controllerStub = str_replace("route('{{modelVariable}}.", "route('{$routeName}.", $controllerStub);
+        $controllerStub = str_replace("route('{$modelVariable}.", "route('{$routeName}.", $controllerStub);
+
+        // Redirect routes in store, update and destroy methods
+        $controllerStub = str_replace(
+            ["redirect()->route('{$modelVariable}.", "redirect()->route('{{modelVariable}}."],
+            "redirect()->route('{$routeName}.",
+            $controllerStub
+        );
 
         // Adjust the namespace and model import if using module style
         if ($moduleStyle) {
@@ -379,9 +394,9 @@ class MakeModuleCommand extends Command
             $controllerStub = preg_replace($pattern, $replacement, $controllerStub);
 
             // Modify the return statement to include options
-            $pattern = '/return view\(\'{{modelVariable}}\.create\'\);/';
+            $pattern = '/return view\(\'.*?\.create\'(?:\s*\)|(?:,\s*\[.*?\]\)));/';
             $viewPrefix = $moduleStyle ? "{$name}::" : "";
-            $replacement = "return view('{$viewPrefix}{{modelVariable}}.create', [" . $this->buildSelectViewParams($selectFields) . "]);";
+            $replacement = "return view('{$viewPrefix}{$modelVariable}.create', [" . $this->buildSelectViewParams($selectFields) . "]);";
             $controllerStub = preg_replace($pattern, $replacement, $controllerStub);
 
             // Do the same for the edit method
@@ -390,28 +405,18 @@ class MakeModuleCommand extends Command
             $controllerStub = preg_replace($pattern, $replacement, $controllerStub);
 
             // Modify the return statement for edit
-            $pattern = '/return view\(\'{{modelVariable}}\.edit\', compact\(\'{{modelVariable}}\'\)\);/';
-            $replacement = "return view('{$viewPrefix}{{modelVariable}}.edit', compact('{{modelVariable}}', " .
+            $pattern = '/return view\(\'.*?\.edit\',\s*compact\(\'{{modelVariable}}\'\)\);/';
+            $replacement = "return view('{$viewPrefix}{$modelVariable}.edit', compact('{{modelVariable}}', " .
                 $this->buildSelectViewParamsCompact($selectFields) . "));";
             $controllerStub = preg_replace($pattern, $replacement, $controllerStub);
 
-            // Add validation rules for select fields
-            $validationCode = "";
-            foreach (array_keys($selectFields) as $field) {
-                $validationCode .= "            '{$field}' => 'required|in:' . implode(',', {$name}::" . strtoupper($field) . "_OPTIONS),\n";
-            }
-
-            // Insert into store and update methods
-            $pattern = '/\$validated = \$request->validate\(\[\s*\/\/ Add validation rules here\s*\]\);/';
-            $replacement = "\$validated = \$request->validate([\n            // Add validation rules here\n{$validationCode}        ]);";
-            $controllerStub = preg_replace($pattern, $replacement, $controllerStub);
         }
 
         // Update all view references if using module style
         if ($moduleStyle) {
             $controllerStub = str_replace(
-                "return view('{{modelVariable}}.",
-                "return view('{$name}::{{modelVariable}}.",
+                "return view('{$modelVariable}.",
+                "return view('{$name}::{$modelVariable}.",
                 $controllerStub
             );
         }
@@ -509,10 +514,12 @@ class MakeModuleCommand extends Command
 
         $viewsToCreate = ['index', 'create', 'edit', 'show'];
         $modelVariable = lcfirst($name);
+        $routeName = Str::plural($modelVariable); // Use plural for route names
 
         // Process fields
         $formFields = '';
         $tableColumns = '';
+        $tableCells = '';
         $detailRows = '';
 
         if (!empty($fields)) {
@@ -531,24 +538,26 @@ class MakeModuleCommand extends Command
                 }
 
                 // Generate form input based on field type
-                $formFields .= $this->generateFormInput($fieldName, $fieldType);
+                $formFields .= $this->generateFormInput($fieldName, $fieldType, $modelVariable);
 
                 // Generate table column for index view
                 $tableColumns .= "<th>" . ucfirst($fieldName) . "</th>\n";
+                $tableCells .= "<td>{{ \${$modelVariable}->{$fieldName} }}</td>\n";
 
                 // Generate detail rows for show view
-                $detailRows .= $this->generateDetailRow($fieldName);
+                $detailRows .= $this->generateDetailRow($fieldName, $modelVariable);
             }
         }
 
         // Process select fields
         $selectInputs = '';
         foreach ($selectFields as $field => $options) {
-            $selectInputs .= $this->generateSelectInput($field, $options);
+            $selectInputs .= $this->generateSelectInput($field, $options, $modelVariable);
 
             // Add to table columns and detail rows
             $tableColumns .= "<th>" . ucfirst($field) . "</th>\n";
-            $detailRows .= $this->generateDetailRow($field);
+            $tableCells .= "<td>{{ \${$modelVariable}->{$field} }}</td>\n";
+            $detailRows .= $this->generateDetailRow($field, $modelVariable);
         }
 
         foreach ($viewsToCreate as $view) {
@@ -566,31 +575,23 @@ class MakeModuleCommand extends Command
             $viewStub = str_replace('{{modelName}}', $name, $viewStub);
             $viewStub = str_replace('{{modelVariable}}', $modelVariable, $viewStub);
 
+            // Replace route references to use plural form
+            $viewStub = str_replace("route('{$modelVariable}.", "route('{$routeName}.", $viewStub);
+            $viewStub = str_replace("route('{{modelVariable}}.", "route('{$routeName}.", $viewStub);
+
             // Add form fields and other dynamic content based on view type
             if ($view === 'create' || $view === 'edit') {
+                // Replace form fields and select fields
                 $viewStub = str_replace('{{form_fields}}', $formFields, $viewStub);
                 $viewStub = str_replace('{{select_fields}}', $selectInputs, $viewStub);
-            } elseif ($view === 'index') {
-                // Replace table headers and rows
-                $viewStub = str_replace('<!-- Add your fields here -->', $tableColumns, $viewStub);
 
-                // Create table data cells
-                $tableCells = '';
-                if (!empty($fields)) {
-                    $fieldArray = explode(',', $fields);
-                    foreach ($fieldArray as $field) {
-                        $fieldName = trim(explode(':', $field)[0]);
-                        if (!array_key_exists($fieldName, $selectFields)) {
-                            $tableCells .= "<td>{{ \${$modelVariable}->{$fieldName} }}</td>\n";
-                        }
-                    }
-                }
-                foreach (array_keys($selectFields) as $field) {
-                    $tableCells .= "<td>{{ \${$modelVariable}->{$field} }}</td>\n";
-                }
-                $viewStub = str_replace('<!-- Add your fields here for each row -->', $tableCells, $viewStub);
+            } elseif ($view === 'index') {
+                // Replace table headers and cells
+                $viewStub = str_replace('{{table_headers}}', $tableColumns, $viewStub);
+                $viewStub = str_replace('{{table_cells}}', $tableCells, $viewStub);
 
             } elseif ($view === 'show') {
+                // Replace detail rows
                 $viewStub = str_replace('{{model_fields}}', $detailRows, $viewStub);
             }
 
@@ -610,14 +611,16 @@ class MakeModuleCommand extends Command
             $this->info("View created: {$path}");
         }
     }
+
     /**
      * Generate form input based on field type.
      *
      * @param string $fieldName
      * @param string $fieldType
+     * @param string $modelVariable
      * @return string
      */
-    protected function generateFormInput($fieldName, $fieldType)
+    protected function generateFormInput($fieldName, $fieldType, $modelVariable)
     {
         $label = ucfirst($fieldName);
         $inputType = 'text';
@@ -638,7 +641,7 @@ class MakeModuleCommand extends Command
                 $extraAttrs = 'step="0.01"';
                 break;
             case 'boolean':
-                return $this->generateCheckboxInput($fieldName);
+                return $this->generateCheckboxInput($fieldName, $modelVariable);
             case 'date':
                 $inputType = 'date';
                 break;
@@ -650,20 +653,21 @@ class MakeModuleCommand extends Command
                 $inputType = 'datetime-local';
                 break;
             case 'text':
-                return $this->generateTextareaInput($fieldName);
+                return $this->generateTextareaInput($fieldName, $modelVariable);
         }
 
         return <<<EOT
     <div class="form-group mb-3">
         <label for="{$fieldName}">{$label}</label>
         <input type="{$inputType}" class="form-control @error('{$fieldName}') is-invalid @enderror"
-               id="{$fieldName}" name="{$fieldName}" value="{{ old('{$fieldName}', \${{'modelVariable'}}->{$fieldName} ?? '') }}" {$extraAttrs}>
+               id="{$fieldName}" name="{$fieldName}" value="{{ old('{$fieldName}', \${$modelVariable}->{$fieldName} ?? '') }}" {$extraAttrs}>
         @error('{$fieldName}')
             <span class="invalid-feedback" role="alert">
                 <strong>{{ \$message }}</strong>
             </span>
         @enderror
     </div>
+
     EOT;
     }
 
@@ -671,9 +675,10 @@ class MakeModuleCommand extends Command
      * Generate textarea input.
      *
      * @param string $fieldName
+     * @param string $modelVariable
      * @return string
      */
-    protected function generateTextareaInput($fieldName)
+    protected function generateTextareaInput($fieldName, $modelVariable)
     {
         $label = ucfirst($fieldName);
 
@@ -681,13 +686,14 @@ class MakeModuleCommand extends Command
     <div class="form-group mb-3">
         <label for="{$fieldName}">{$label}</label>
         <textarea class="form-control @error('{$fieldName}') is-invalid @enderror"
-                  id="{$fieldName}" name="{$fieldName}" rows="4">{{ old('{$fieldName}', \${{'modelVariable'}}->{$fieldName} ?? '') }}</textarea>
+                  id="{$fieldName}" name="{$fieldName}" rows="4">{{ old('{$fieldName}', \${$modelVariable}->{$fieldName} ?? '') }}</textarea>
         @error('{$fieldName}')
             <span class="invalid-feedback" role="alert">
                 <strong>{{ \$message }}</strong>
             </span>
         @enderror
     </div>
+
     EOT;
     }
 
@@ -695,9 +701,10 @@ class MakeModuleCommand extends Command
      * Generate checkbox input.
      *
      * @param string $fieldName
+     * @param string $modelVariable
      * @return string
      */
-    protected function generateCheckboxInput($fieldName)
+    protected function generateCheckboxInput($fieldName, $modelVariable)
     {
         $label = ucfirst($fieldName);
 
@@ -705,7 +712,7 @@ class MakeModuleCommand extends Command
     <div class="form-check mb-3">
         <input type="checkbox" class="form-check-input @error('{$fieldName}') is-invalid @enderror"
                id="{$fieldName}" name="{$fieldName}" value="1"
-               {{ old('{$fieldName}', \${{'modelVariable'}}->{$fieldName} ?? '') ? 'checked' : '' }}>
+               {{ old('{$fieldName}', \${$modelVariable}->{$fieldName} ?? '') ? 'checked' : '' }}>
         <label class="form-check-label" for="{$fieldName}">{$label}</label>
         @error('{$fieldName}')
             <span class="invalid-feedback" role="alert">
@@ -713,6 +720,7 @@ class MakeModuleCommand extends Command
             </span>
         @enderror
     </div>
+
     EOT;
     }
 
@@ -721,16 +729,17 @@ class MakeModuleCommand extends Command
      *
      * @param string $fieldName
      * @param array $options
+     * @param string $modelVariable
      * @return string
      */
-    protected function generateSelectInput($fieldName, array $options)
+    protected function generateSelectInput($fieldName, array $options, $modelVariable)
     {
         $label = ucfirst($fieldName);
 
         $optionsHtml = '';
         foreach ($options as $option) {
             $option = trim($option);
-            $optionsHtml .= "        <option value=\"{$option}\" {{ old('{$fieldName}', \${{'modelVariable'}}->{$fieldName} ?? '') == '{$option}' ? 'selected' : '' }}>{$option}</option>\n";
+            $optionsHtml .= "        <option value=\"{$option}\" {{ old('{$fieldName}', \${$modelVariable}->{$fieldName} ?? '') == '{$option}' ? 'selected' : '' }}>{$option}</option>\n";
         }
 
         return <<<EOT
@@ -746,6 +755,7 @@ class MakeModuleCommand extends Command
             </span>
         @enderror
     </div>
+
     EOT;
     }
 
@@ -753,17 +763,19 @@ class MakeModuleCommand extends Command
      * Generate detail row for show view.
      *
      * @param string $fieldName
+     * @param string $modelVariable
      * @return string
      */
-    protected function generateDetailRow($fieldName)
+    protected function generateDetailRow($fieldName, $modelVariable)
     {
         $label = ucfirst($fieldName);
 
         return <<<EOT
     <tr>
         <th>{$label}</th>
-        <td>{{ \${{'modelVariable'}}->{$fieldName} }}</td>
+        <td>{{ \${$modelVariable}->{$fieldName} }}</td>
     </tr>
+
     EOT;
     }
 

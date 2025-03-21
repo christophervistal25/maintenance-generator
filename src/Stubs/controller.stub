@@ -37,11 +37,7 @@ class {{controllerName}} extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            // Add validation rules here
-        ]);
-
-        {{modelName}}::create($validated);
+        {{modelName}}::create($request->all());
 
         return redirect()->route('{{modelVariable}}.index')
             ->with('success', '{{modelName}} created successfully.');
@@ -78,11 +74,7 @@ class {{controllerName}} extends Controller
      */
     public function update(Request $request, {{modelName}} ${{modelVariable}})
     {
-        $validated = $request->validate([
-            // Add validation rules here
-        ]);
-
-        ${{modelVariable}}->update($validated);
+        ${{modelVariable}}->update($request->all());
 
         return redirect()->route('{{modelVariable}}.index')
             ->with('success', '{{modelName}} updated successfully');

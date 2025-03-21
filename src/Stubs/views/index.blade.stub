@@ -8,7 +8,7 @@
                 <div class="card-header">
                     <div class="d-flex justify-content-between">
                         <h3>{{modelName}} List</h3>
-                        <a href="{{ route('{{modelVariable}}.create') }}" class="btn btn-primary">Create New {{modelName}}</a>
+                        <a href="{{ route('{{modelVariable}}s.create') }}" class="btn btn-primary">Create New {{modelName}}</a>
                     </div>
                 </div>
 
@@ -23,7 +23,7 @@
                         <thead>
                             <tr>
                                 <th>ID</th>
-                                <!-- Add your fields here -->
+                                {{table_headers}}
                                 <th>Created At</th>
                                 <th>Actions</th>
                             </tr>
@@ -32,12 +32,12 @@
                             @foreach (${{modelVariable}}s as ${{modelVariable}})
                             <tr>
                                 <td>{{ ${{modelVariable}}->id }}</td>
-                                <!-- Add your fields here -->
+                                {{table_cells}}
                                 <td>{{ ${{modelVariable}}->created_at->format('Y-m-d') }}</td>
                                 <td>
-                                    <a href="{{ route('{{modelVariable}}.show', ${{modelVariable}}->id) }}" class="btn btn-sm btn-info">View</a>
-                                    <a href="{{ route('{{modelVariable}}.edit', ${{modelVariable}}->id) }}" class="btn btn-sm btn-primary">Edit</a>
-                                    <form action="{{ route('{{modelVariable}}.destroy', ${{modelVariable}}->id) }}" method="POST" style="display: inline-block">
+                                    <a href="{{ route('{{modelVariable}}s.show', ${{modelVariable}}->id) }}" class="btn btn-sm btn-info">View</a>
+                                    <a href="{{ route('{{modelVariable}}s.edit', ${{modelVariable}}->id) }}" class="btn btn-sm btn-primary">Edit</a>
+                                    <form action="{{ route('{{modelVariable}}s.destroy', ${{modelVariable}}->id) }}" method="POST" style="display: inline-block">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</button>

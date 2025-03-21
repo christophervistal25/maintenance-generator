@@ -8,7 +8,7 @@
                 <div class="card-header">
                     <div class="d-flex justify-content-between">
                         <h3>Create {{modelName}}</h3>
-                        <a href="{{ route('{{modelVariable}}.index') }}" class="btn btn-secondary">Back to List</a>
+                        <a href="{{ route('{{modelVariable}}s.index') }}" class="btn btn-secondary">Back to List</a>
                     </div>
                 </div>
 
@@ -23,12 +23,10 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('{{modelVariable}}.store') }}">
+                    <form method="POST" action="{{ route('{{modelVariable}}s.store') }}">
                         @csrf
 
-                        <!-- Form fields will be added here dynamically based on your fields option -->
-
-                        <!-- Select fields will be added here -->
+                        {{form_fields}}
                         {{select_fields}}
 
                         <div class="form-group mt-4">
